@@ -22,7 +22,7 @@ Anything else is considered safe and is not stored.
 
 ```
  Supplier CSV ──┐
-                ├──► SQLite (monster.db) ──► Dashboard (Jinja2 + Tailwind)
+                ├──► SQLite (sync_engine.db) ──► Dashboard (Jinja2 + Tailwind)
  Warehouse XLSX ┤         ▲                 ├► Excel / CSV export
                 │         │                 └► Nightly HTML email (SMTP)
  Marketplace API┘   APScheduler jobs
@@ -51,7 +51,7 @@ cp .env.example .env    # then fill in real values
 uvicorn main:app --reload
 ```
 
-The app is served under `BASE_PATH` (default `/ocm`): http://127.0.0.1:8000/ocm/
+The app is served under `BASE_PATH` (default `/sync`): http://127.0.0.1:8000/sync/
 
 ### Configuration (`.env`)
 
@@ -85,4 +85,4 @@ A store with missing credentials is skipped. Never commit `.env`; it is gitignor
 
 ## License
 
-No license has been chosen yet. All rights are reserved by the author until one is added.
+[MIT](LICENSE)

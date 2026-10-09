@@ -23,7 +23,7 @@ load_dotenv()
 
 from database import init_db, get_conn, DB_PATH
 
-BASE_PATH = os.getenv("BASE_PATH", "/ocm")
+BASE_PATH = os.getenv("BASE_PATH", "/sync")
 
 SOURCE_URL     = os.getenv("SOURCE_URL", "https://api.supplier-example.com/v1/catalog.csv")
 MARKETPLACE_API_KEY   = os.getenv("MARKETPLACE_API_KEY", "")

@@ -1,7 +1,7 @@
 import sqlite3
 from contextlib import contextmanager
 
-DB_PATH = "monster.db"
+DB_PATH = "sync_engine.db"
 
 
 def _init_pragmas():
