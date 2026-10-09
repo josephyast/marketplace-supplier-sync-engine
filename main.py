@@ -1391,10 +1391,10 @@ async def export_catalog(
 
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="SupplierStok")
+        df.to_excel(writer, index=False, sheet_name="Supplier Stock")
     buf.seek(0)
 
-    filename = f"supplierstok_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+    filename = f"supplier_stock_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1555,7 +1555,7 @@ def _build_email_html(
 <html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="font-family:Arial,Helvetica,sans-serif;max-width:840px;margin:0 auto;padding:20px;color:#1e293b;background:#f1f5f9">
   <div style="background:#4f46e5;color:white;padding:18px 24px;border-radius:10px 10px 0 0">
-    <h2 style="margin:0;font-size:19px;font-weight:700">SupplierCSV Monster &mdash; Günlük Marketplace Raporu</h2>
+    <h2 style="margin:0;font-size:19px;font-weight:700">Marketplace Supplier Sync Engine &mdash; Günlük Marketplace Raporu</h2>
     <p style="margin:4px 0 0;opacity:.8;font-size:13px">{date_str} &mdash; {total_action} ürün acil aksiyon bekliyor</p>
   </div>
   <div style="background:#ffffff;padding:24px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px">
@@ -1618,7 +1618,7 @@ def send_daily_report_email():
     msg["From"]    = SENDER_EMAIL
     msg["To"]      = RECEIVER_EMAIL
     msg["Subject"] = (
-        f"[SupplierCSV] Günlük Marketplace Raporu — {datetime.now().strftime('%d.%m.%Y')} — "
+        f"[Sync Engine] Günlük Marketplace Raporu — {datetime.now().strftime('%d.%m.%Y')} — "
         f"{len(critical)} Kritik / {len(ghost)} Stok Bitti / {len(missing)} Stok Aç"
     )
     msg.attach(MIMEText(html_body, "html", "utf-8"))
