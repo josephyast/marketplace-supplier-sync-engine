@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SupplierCSV Monster</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen font-sans antialiased">
+
+  <!-- Top Header Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div>
+        <span class="text-base font-semibold text-slate-900 tracking-tight">SupplierCSV Monster</span>
+        <span class="ml-3 text-xs text-slate-400">Last sync: {{ last_sync[:19] if last_sync else 'Never' }}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="syncAll(this)"
+          class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition disabled:opacity-50">
+          Fetch &amp; Sync All
+        </button>
+        <label class="inline-flex items-center gap-1.5 cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-sm font-medium transition">
+          Import Supplier CSV
+          <input type="file" accept=".csv" class="hidden" onchange="uploadCSV(this, '{{ base_path }}/import')" />
+        </label>
+        <label class="inline-flex items-center gap-1.5 cursor-pointer bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-md text-sm font-medium transition">
+          Sync Marketplace CSV
+          <input type="file" accept=".csv" class="hidden" onchange="uploadCSV(this, '{{ base_path }}/marketplace/sync')" />
+        </label>
+        <label class="inline-flex items-center gap-1.5 cursor-pointer bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-md text-sm font-medium transition">
+          Import Local Warehouse
+          <input type="file" accept=".xlsx,.xls" class="hidden" onchange="uploadCSV(this, '{{ base_path }}/warehouse/import')" />
+        </label>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-6 py-6">
+
+    <!-- Status Banner -->
+    <div id="banner" class="hidden mb-4 px-4 py-2.5 rounded-md text-sm font-medium border"></div>
+
+    <!-- Tab Nav -->
+    <div class="flex gap-0 border-b border-slate-200 mb-6">
+      <button onclick="switchTab('stock')" id="tab-stock"
+        class="tab-btn px-5 py-2.5 text-sm font-medium transition border-b-2 border-indigo-600 text-indigo-600">
+        Stock Changes
+        <span class="ml-2 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs font-semibold">
+          {{ new_items|length + out_of_stock|length }}
+        </span>
+      </button>
+      <button onclick="switchTab('price')" id="tab-price"
+        class="tab-btn px-5 py-2.5 text-sm font-medium transition border-b-2 border-transparent text-slate-500 hover:text-slate-700">
+        Price Changes
+        <span class="ml-2 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs font-semibold">
+          {{ price_up|length + price_down|length }}
+        </span>
+      </button>
+      <button onclick="switchTab('catalog')" id="tab-catalog"
+        class="tab-btn px-5 py-2.5 text-sm font-medium transition border-b-2 border-transparent text-slate-500 hover:text-slate-700">
+        SupplierStok
+        <span class="ml-2 bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs font-semibold">
+          {{ "{:,}".format(catalog_batch_total) }}
+        </span>
+      </button>
+      <button onclick="switchTab('marketplacesync')" id="tab-marketplacesync"
+        class="tab-btn px-5 py-2.5 text-sm font-medium transition border-b-2 border-transparent text-slate-500 hover:text-slate-700">
+        Marketplace
+        <span class="ml-2 {% if marketplace_sync_batch_total > 0 %}bg-orange-50 text-orange-700 border border-orange-200{% else %}bg-slate-100 text-slate-600{% endif %} px-2 py-0.5 rounded-full text-xs font-semibold">
+          {{ marketplace_sync_batch_total }}
+        </span>
+      </button>
+      <a href="{{ base_path }}/marketplace/all-products"
+        class="px-5 py-2.5 text-sm font-medium transition border-b-2 border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-400 whitespace-nowrap">
+        All Marketplace Products ↗
+      </a>
+    </div>
+
+    <!-- Tab: Stock Changes -->
+    <div id="panel-stock">
+      {% if new_items %}
+      <div class="mb-6 bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div class="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-green-500"></span>
+          <h2 class="text-sm font-semibold text-slate-700">New Items</h2>
+          <span class="bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full text-xs font-semibold">{{ new_items|length }}</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wide border-b border-slate-200">
+                <th class="text-left px-5 py-2.5">Product ID</th>
+                <th class="text-left px-5 py-2.5">Title</th>
+                <th class="text-right px-5 py-2.5">Stock</th>
+                <th class="text-right px-5 py-2.5">Price</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for row in new_items %}
+              <tr class="hover:bg-slate-50 transition">
+                <td class="px-5 py-2.5 text-slate-400 text-xs font-mono">{{ row.product_id }}</td>
+                <td class="px-5 py-2.5 text-slate-700">{{ row.title or '—' }}</td>
+                <td class="px-5 py-2.5 text-right">
+                  <span class="bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded text-xs font-semibold">{{ row.stock }}</span>
+                </td>
+                <td class="px-5 py-2.5 text-right text-slate-600">{{ "%.2f"|format(row.price) if row.price else '—' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if out_of_stock %}
+      <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div class="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-red-500"></span>
+          <h2 class="text-sm font-semibold text-slate-700">Out of Stock</h2>
+          <span class="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded-full text-xs font-semibold">{{ out_of_stock|length }}</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wide border-b border-slate-200">
+                <th class="text-left px-5 py-2.5">Product ID</th>
+                <th class="text-left px-5 py-2.5">Title</th>
+                <th class="text-right px-5 py-2.5">Prev Stock</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for row in out_of_stock %}
+              <tr class="hover:bg-slate-50 transition">
+                <td class="px-5 py-2.5 text-slate-400 text-xs font-mono">{{ row.product_id }}</td>
+                <td class="px-5 py-2.5 text-slate-700">{{ row.title or '—' }}</td>
+                <td class="px-5 py-2.5 text-right">
+                  <span class="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-xs font-semibold">{{ row.stock_old }}</span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if not new_items and not out_of_stock %}
+      <div class="bg-white border border-slate-200 rounded-lg px-5 py-10 text-center text-slate-400 text-sm">
+        No stock changes. Import at least two days of CSVs.
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Tab: Price Changes -->
+    <div id="panel-price" class="hidden">
+      {% if price_up %}
+      <div class="mb-6 bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div class="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+          <h2 class="text-sm font-semibold text-slate-700">Price Up</h2>
+          <span class="bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full text-xs font-semibold">{{ price_up|length }}</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wide border-b border-slate-200">
+                <th class="text-left px-5 py-2.5">Product ID</th>
+                <th class="text-left px-5 py-2.5">Title</th>
+                <th class="text-right px-5 py-2.5">Old Price</th>
+                <th class="text-right px-5 py-2.5">New Price</th>
+                <th class="text-right px-5 py-2.5">Delta</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for row in price_up %}
+              <tr class="hover:bg-slate-50 transition">
+                <td class="px-5 py-2.5 text-slate-400 text-xs font-mono">{{ row.product_id }}</td>
+                <td class="px-5 py-2.5 text-slate-700">{{ row.title or '—' }}</td>
+                <td class="px-5 py-2.5 text-right text-slate-400">{{ "%.2f"|format(row.price_old) }}</td>
+                <td class="px-5 py-2.5 text-right text-slate-700 font-medium">{{ "%.2f"|format(row.price_new) }}</td>
+                <td class="px-5 py-2.5 text-right">
+                  <span class="bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded text-xs font-semibold">+{{ "%.2f"|format(row.price_new - row.price_old) }}</span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if price_down %}
+      <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div class="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+          <h2 class="text-sm font-semibold text-slate-700">Price Down</h2>
+          <span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full text-xs font-semibold">{{ price_down|length }}</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wide border-b border-slate-200">
+                <th class="text-left px-5 py-2.5">Product ID</th>
+                <th class="text-left px-5 py-2.5">Title</th>
+                <th class="text-right px-5 py-2.5">Old Price</th>
+                <th class="text-right px-5 py-2.5">New Price</th>
+                <th class="text-right px-5 py-2.5">Delta</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for row in price_down %}
+              <tr class="hover:bg-slate-50 transition">
+                <td class="px-5 py-2.5 text-slate-400 text-xs font-mono">{{ row.product_id }}</td>
+                <td class="px-5 py-2.5 text-slate-700">{{ row.title or '—' }}</td>
+                <td class="px-5 py-2.5 text-right text-slate-400">{{ "%.2f"|format(row.price_old) }}</td>
+                <td class="px-5 py-2.5 text-right text-slate-700 font-medium">{{ "%.2f"|format(row.price_new) }}</td>
+                <td class="px-5 py-2.5 text-right">
+                  <span class="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded text-xs font-semibold">{{ "%.2f"|format(row.price_new - row.price_old) }}</span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if not price_up and not price_down %}
+      <div class="bg-white border border-slate-200 rounded-lg px-5 py-10 text-center text-slate-400 text-sm">
+        No price changes. Import at least two days of CSVs.
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Tab: Current Catalog -->
+    <div id="panel-catalog" class="hidden">
+
+      {# Every link below is built from the full incoming query string via
+         page_url(), so no filter — this module's or the other's — is ever
+         dropped. carry_params() does the same for form submissions. #}
+      {% macro carry_params(owned) -%}
+        {%- for k, v in request.query_params.items() if k not in owned -%}
+        <input type="hidden" name="{{ k }}" value="{{ v }}" />
+        {% endfor -%}
+      {%- endmacro %}
+      {% set catalog_params = ['page','q','brand','stock_min','stock_max',
+                               'dealer_price_min','dealer_price_max','not_listed',
+                               'sort_by','order'] %}
+
+      {% macro sort_icon(col) %}{% if catalog_sort_by == col %}<span class="text-indigo-600 ml-0.5">{{ '↑' if catalog_order == 'asc' else '↓' }}</span>{% endif %}{% endmacro %}
+
+      <!-- Filters -->
+      <div class="bg-white border border-slate-200 rounded-lg p-4 mb-4">
+        <form method="get" action="{{ base_path }}/" class="space-y-3">
+          <input type="hidden" name="page" value="1" />
+          <input type="hidden" name="sort_by" value="{{ catalog_sort_by }}" />
+          <input type="hidden" name="order" value="{{ catalog_order }}" />
+          {{ carry_params(catalog_params) }}
+          <div class="flex gap-2 flex-wrap items-center">
+            <input name="q" value="{{ catalog_q }}" placeholder="Search title / EAN…"
+              class="flex-1 min-w-40 bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
+            <input name="brand" value="{{ catalog_brand }}" placeholder="Brand…"
+              class="w-40 bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
+            <label class="inline-flex items-center gap-1.5 cursor-pointer select-none text-sm text-slate-600 whitespace-nowrap">
+              <input type="checkbox" name="not_listed" value="true" {% if catalog_not_listed %}checked{% endif %}
+                class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+              Not Listed on Marketplace
+            </label>
+          </div>
+          <div class="flex gap-2 flex-wrap items-center">
+            <span class="text-xs font-medium text-slate-500">Stock:</span>
+            <input name="stock_min" value="{{ catalog_stock_min or '' }}" placeholder="Min" type="number" min="0"
+              class="w-24 bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
+            <input name="stock_max" value="{{ catalog_stock_max or '' }}" placeholder="Max" type="number" min="0"
+              class="w-24 bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
+            <span class="text-xs font-medium text-slate-500 ml-2">Dealer €:</span>
+            <input name="dealer_price_min" value="{{ catalog_dealer_price_min or '' }}" placeholder="Min" type="number" step="0.01" min="0"
+              class="w-24 bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
+            <input name="dealer_price_max" value="{{ catalog_dealer_price_max or '' }}" placeholder="Max" type="number" step="0.01" min="0"
+              class="w-24 bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
+            <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-md text-sm font-medium transition">Apply</button>
+            <a href="{{ page_url(request, '/export/catalog.xlsx', page='') }}"
+              class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-md text-sm font-medium transition"
+              title="Download all {{ '{:,}'.format(catalog_total) }} filtered rows as Excel">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
+              </svg>
+              Excel İndir
+            </a>
+            <a href="{{ page_url(request, page=1, q='', brand='', stock_min='', stock_max='', dealer_price_min='', dealer_price_max='', not_listed='') }}" class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-600 px-3 py-1.5 rounded-md text-sm font-medium transition">Clear</a>
+          </div>
+        </form>
+      </div>
+
+      {% if catalog %}
+      {% set total_pages = ((catalog_total - 1) // catalog_page_size + 1) if catalog_total > 0 else 1 %}
+      <div class="flex items-center justify-between mb-3 text-xs text-slate-500">
+        <span>
+          {{ "{:,}".format(catalog_total) }} result{{ 's' if catalog_total != 1 else '' }}
+          {% if catalog_q or catalog_brand or catalog_stock_min is not none or catalog_stock_max is not none or catalog_dealer_price_min is not none or catalog_dealer_price_max is not none %}
+          <span class="text-slate-400">(filtered from {{ "{:,}".format(catalog_batch_total) }})</span>
+          {% endif %}
+        </span>
+        <span class="text-slate-400">Page {{ catalog_page }} / {{ total_pages }}</span>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wide border-b border-slate-200 select-none">
+                <th class="px-4 py-2.5 w-12">Img</th>
+                <th class="px-4 py-2.5 text-left cursor-pointer hover:text-slate-700 transition">
+                  <a href="{{ page_url(request, page=1, sort_by='product_id', order='desc' if catalog_sort_by == 'product_id' and catalog_order == 'asc' else 'asc') }}">
+                    ID {{ sort_icon('product_id') }}
+                  </a>
+                </th>
+                <th class="px-4 py-2.5 text-left cursor-pointer hover:text-slate-700 transition">
+                  <a href="{{ page_url(request, page=1, sort_by='title', order='desc' if catalog_sort_by == 'title' and catalog_order == 'asc' else 'asc') }}">
+                    Title {{ sort_icon('title') }}
+                  </a>
+                </th>
+                <th class="px-4 py-2.5 text-left cursor-pointer hover:text-slate-700 transition">
+                  <a href="{{ page_url(request, page=1, sort_by='brand', order='desc' if catalog_sort_by == 'brand' and catalog_order == 'asc' else 'asc') }}">
+                    Brand {{ sort_icon('brand') }}
+                  </a>
+                </th>
+                <th class="px-4 py-2.5 text-left text-slate-500">Offer ID</th>
+                <th class="px-4 py-2.5 text-right cursor-pointer hover:text-slate-700 transition">
+                  <a href="{{ page_url(request, page=1, sort_by='stock', order='desc' if catalog_sort_by == 'stock' and catalog_order == 'asc' else 'asc') }}">
+                    Stock {{ sort_icon('stock') }}
+                  </a>
+                </th>
+                <th class="px-4 py-2.5 text-right cursor-pointer hover:text-slate-700 transition">
+                  <a href="{{ page_url(request, page=1, sort_by='dealer_price', order='desc' if catalog_sort_by == 'dealer_price' and catalog_order == 'asc' else 'asc') }}">
+                    Dealer € {{ sort_icon('dealer_price') }}
+                  </a>
+                </th>
+                <th class="px-4 py-2.5 text-left">Link</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for row in catalog %}
+              <tr class="hover:bg-slate-50 transition">
+                <td class="px-4 py-2">
+                  {% if row.main_image_url %}
+                  <img src="{{ row.main_image_url }}" alt="" class="w-9 h-9 object-contain rounded bg-slate-100" loading="lazy" />
+                  {% else %}
+                  <div class="w-9 h-9 bg-slate-100 rounded"></div>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2.5 text-slate-400 text-xs font-mono">{{ row.product_id }}</td>
+                <td class="px-4 py-2.5 max-w-xs truncate" title="{{ row.title }}">
+                  <a href="{{ base_path }}/product/{{ row.product_id }}"
+                    class="text-slate-700 hover:text-indigo-600 font-medium transition">{{ row.title or '—' }}</a>
+                </td>
+                <td class="px-4 py-2.5 text-slate-500">{{ row.brand or '—' }}</td>
+                <td class="px-4 py-2.5 text-slate-400 font-mono text-xs">{{ row.offer_id or '—' }}</td>
+                <td class="px-4 py-2.5 text-right">
+                  {% if row.stock == 0 %}
+                  <span class="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-xs font-semibold">0</span>
+                  {% else %}
+                  <span class="bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded text-xs font-semibold">{{ row.stock }}</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2.5 text-right text-slate-600 font-medium">{{ "%.2f"|format(row.dealer_price) }}</td>
+                <td class="px-4 py-2.5">
+                  {% if row.product_url %}
+                  <a href="{{ row.product_url }}" target="_blank" rel="noopener"
+                    class="text-indigo-600 hover:text-indigo-700 text-xs font-medium transition">↗ View</a>
+                  {% else %}<span class="text-slate-300">—</span>{% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="flex gap-2 mt-4">
+        {% if catalog_page > 1 %}
+        <a href="{{ page_url(request, page=catalog_page - 1) }}"
+          class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-600 px-3 py-1.5 rounded-md text-sm font-medium transition">← Prev</a>
+        {% endif %}
+        {% if catalog_page < total_pages %}
+        <a href="{{ page_url(request, page=catalog_page + 1) }}"
+          class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-600 px-3 py-1.5 rounded-md text-sm font-medium transition">Next →</a>
+        {% endif %}
+      </div>
+
+      {% else %}
+      <div class="bg-white border border-slate-200 rounded-lg px-5 py-10 text-center text-slate-400 text-sm">
+        No results. Try different filters or fetch supplier CSV first.
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Tab: Marketplace Sync -->
+    <div id="panel-marketplacesync" class="hidden">
+
+      {% set marketplace_params = ['marketplace_page','marketplace_q','marketplace_store','marketplace_status',
+                            'marketplace_sort_by','marketplace_order','marketplace_per_page'] %}
+      {% set marketplace_total_pages = ((marketplace_sync_total + marketplace_per_page - 1) // marketplace_per_page) if marketplace_per_page > 0 else 1 %}
+
+      {% macro marketplace_sort_icon(col) %}
+        {% if marketplace_sort_by == col %}
+          {% if marketplace_order == 'asc' %}↑{% else %}↓{% endif %}
+        {% endif %}
+      {% endmacro %}
+
+      <!-- Header row -->
+      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-700">Marketplace Discrepancy Report
+            <span class="ml-1 bg-slate-100 text-slate-500 text-xs font-semibold px-2 py-0.5 rounded-full">{{ marketplace_sync_batch_total }}</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Last synced: {{ marketplace_sync_last[:19] if marketplace_sync_last else 'Never' }}</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-1 py-1">
+            <span class="text-xs text-slate-400 px-2 font-medium">Export</span>
+            <a href="{{ base_path }}/marketplace/export/xlsx"
+              class="bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 text-slate-600 hover:text-emerald-700 px-3 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap">
+              XLSX
+            </a>
+            <a href="{{ base_path }}/marketplace/export/csv"
+              class="bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 text-slate-600 hover:text-blue-700 px-3 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap">
+              CSV
+            </a>
+            <a href="{{ base_path }}/marketplace/export/json"
+              class="bg-white hover:bg-indigo-50 border border-slate-200 hover:border-indigo-300 text-slate-600 hover:text-indigo-700 px-3 py-1 rounded-md text-xs font-semibold transition whitespace-nowrap">
+              JSON
+            </a>
+          </div>
+          <button onclick="syncMarketplaceNow(this)"
+            class="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition disabled:opacity-50">
+            Sync Marketplace Now
+          </button>
+        </div>
+      </div>
+
+      <!-- Status metric cards (clickable filters) -->
+      <div class="grid grid-cols-4 gap-3 mb-4">
+        {% set cl_count = marketplace_sync_counts.get('CRITICAL LOSS', 0) %}
+        {% set cl_active = marketplace_status == 'CRITICAL LOSS' %}
+        <a href="{{ page_url(request, marketplace_page=1, marketplace_status='' if cl_active else 'CRITICAL LOSS') }}"
+          class="rounded-xl px-4 py-3 text-center border-2 transition {{ 'bg-red-600 border-red-600 text-white ring-2 ring-red-400 ring-offset-2 shadow-lg' if cl_active else 'bg-red-50 border-red-200 text-red-700 hover:border-red-400 hover:bg-red-100' }}">
+          <div class="text-2xl font-bold">{{ cl_count }}</div>
+          <div class="text-xs font-semibold mt-0.5 {{ 'opacity-90' if cl_active else '' }}">Critical Loss</div>
+        </a>
+
+        {% set gs_count = marketplace_sync_counts.get('GHOST STOCK', 0) %}
+        {% set gs_active = marketplace_status == 'GHOST STOCK' %}
+        <a href="{{ page_url(request, marketplace_page=1, marketplace_status='' if gs_active else 'GHOST STOCK') }}"
+          class="rounded-xl px-4 py-3 text-center border-2 transition {{ 'bg-purple-700 border-purple-700 text-white ring-2 ring-purple-400 ring-offset-2 shadow-lg' if gs_active else 'bg-purple-50 border-purple-200 text-purple-700 hover:border-purple-400 hover:bg-purple-100' }}">
+          <div class="text-2xl font-bold">{{ gs_count }}</div>
+          <div class="text-xs font-semibold mt-0.5 {{ 'opacity-90' if gs_active else '' }}">Ghost Stock</div>
+        </a>
+
+        {% set ms_count = marketplace_sync_counts.get('MISSING STOCK', 0) %}
+        {% set ms_active = marketplace_status == 'MISSING STOCK' %}
+        <a href="{{ page_url(request, marketplace_page=1, marketplace_status='' if ms_active else 'MISSING STOCK') }}"
+          class="rounded-xl px-4 py-3 text-center border-2 transition {{ 'bg-blue-600 border-blue-600 text-white ring-2 ring-blue-400 ring-offset-2 shadow-lg' if ms_active else 'bg-blue-50 border-blue-200 text-blue-700 hover:border-blue-400 hover:bg-blue-100' }}">
+          <div class="text-2xl font-bold">{{ ms_count }}</div>
+          <div class="text-xs font-semibold mt-0.5 {{ 'opacity-90' if ms_active else '' }}">Missing Stock</div>
+        </a>
+
+        {% set lm_count = marketplace_sync_counts.get('LOW MARGIN', 0) %}
+        {% set lm_active = marketplace_status == 'LOW MARGIN' %}
+        <a href="{{ page_url(request, marketplace_page=1, marketplace_status='' if lm_active else 'LOW MARGIN') }}"
+          class="rounded-xl px-4 py-3 text-center border-2 transition {{ 'bg-amber-500 border-amber-500 text-white ring-2 ring-amber-300 ring-offset-2 shadow-lg' if lm_active else 'bg-amber-50 border-amber-200 text-amber-700 hover:border-amber-400 hover:bg-amber-100' }}">
+          <div class="text-2xl font-bold">{{ lm_count }}</div>
+          <div class="text-xs font-semibold mt-0.5 {{ 'opacity-90' if lm_active else '' }}">Low Margin</div>
+        </a>
+      </div>
+
+      <!-- Filters -->
+      <form method="get" action="{{ base_path }}/" class="flex flex-wrap gap-2 mb-4">
+        <input name="marketplace_q" value="{{ marketplace_q }}" placeholder="Search offer ID or title…"
+          class="border border-slate-300 rounded-md px-3 py-1.5 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 w-56" />
+        <select name="marketplace_store"
+          class="border border-slate-300 rounded-md text-sm text-slate-700 px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          <option value="" {% if not marketplace_store %}selected{% endif %}>All Stores</option>
+          <option value="Store A" {% if marketplace_store == 'Store A' %}selected{% endif %}>Store A</option>
+          <option value="Store B" {% if marketplace_store == 'Store B' %}selected{% endif %}>Store B</option>
+        </select>
+        <select name="marketplace_per_page"
+          class="border border-slate-300 rounded-md text-sm text-slate-700 px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          {% for n in [25, 50, 100] %}
+          <option value="{{ n }}" {% if marketplace_per_page == n %}selected{% endif %}>{{ n }} / page</option>
+          {% endfor %}
+        </select>
+        <input type="hidden" name="marketplace_sort_by" value="{{ marketplace_sort_by }}" />
+        <input type="hidden" name="marketplace_order"   value="{{ marketplace_order }}" />
+        <input type="hidden" name="marketplace_status"  value="{{ marketplace_status }}" />
+        {{ carry_params(marketplace_params) }}
+        <button type="submit"
+          class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-1.5 rounded-md text-sm font-medium transition">
+          Apply
+        </button>
+        {% if marketplace_q or marketplace_store or marketplace_status %}
+        <a href="{{ page_url(request, marketplace_page=1, marketplace_q='', marketplace_store='', marketplace_status='') }}"
+          class="text-slate-400 hover:text-slate-600 text-sm py-1.5 transition">Clear</a>
+        {% endif %}
+      </form>
+
+      <!-- Table -->
+      {% if marketplace_sync_rows %}
+
+      <div class="bg-white border border-slate-200 rounded-lg overflow-hidden mb-4">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wide border-b border-slate-200 select-none">
+                <th class="px-4 py-2.5 w-12">Img</th>
+                <th class="text-left px-4 py-2.5 cursor-pointer hover:text-slate-700">
+                  <a href="{{ page_url(request, marketplace_page=1, marketplace_sort_by='product_id', marketplace_order='desc' if marketplace_sort_by == 'product_id' and marketplace_order == 'asc' else 'asc') }}">
+                    Product {{ marketplace_sort_icon('product_id') }}
+                  </a>
+                </th>
+                <th class="text-left px-4 py-2.5 cursor-pointer hover:text-slate-700">
+                  <a href="{{ page_url(request, marketplace_page=1, marketplace_sort_by='store_name', marketplace_order='desc' if marketplace_sort_by == 'store_name' and marketplace_order == 'asc' else 'asc') }}">
+                    Store {{ marketplace_sort_icon('store_name') }}
+                  </a>
+                </th>
+                <th class="text-right px-4 py-2.5 cursor-pointer hover:text-slate-700">
+                  <a href="{{ page_url(request, marketplace_page=1, marketplace_sort_by='supplier_stock', marketplace_order='desc' if marketplace_sort_by == 'supplier_stock' and marketplace_order == 'asc' else 'asc') }}">
+                    Sup. Stock {{ marketplace_sort_icon('supplier_stock') }}
+                  </a>
+                </th>
+                <th class="text-right px-4 py-2.5 cursor-pointer hover:text-slate-700">
+                  <a href="{{ page_url(request, marketplace_page=1, marketplace_sort_by='marketplace_stock', marketplace_order='desc' if marketplace_sort_by == 'marketplace_stock' and marketplace_order == 'asc' else 'asc') }}">
+                    Marketplace Stock {{ marketplace_sort_icon('marketplace_stock') }}
+                  </a>
+                </th>
+                <th class="text-right px-4 py-2.5">Depo</th>
+                <th class="text-right px-4 py-2.5 cursor-pointer hover:text-slate-700">
+                  <a href="{{ page_url(request, marketplace_page=1, marketplace_sort_by='supplier_dealer_price', marketplace_order='desc' if marketplace_sort_by == 'supplier_dealer_price' and marketplace_order == 'asc' else 'asc') }}">
+                    Sup. Dealer € {{ marketplace_sort_icon('supplier_dealer_price') }}
+                  </a>
+                </th>
+                <th class="text-right px-4 py-2.5 cursor-pointer hover:text-slate-700">
+                  <a href="{{ page_url(request, marketplace_page=1, marketplace_sort_by='marketplace_price', marketplace_order='desc' if marketplace_sort_by == 'marketplace_price' and marketplace_order == 'asc' else 'asc') }}">
+                    Marketplace Price € {{ marketplace_sort_icon('marketplace_price') }}
+                  </a>
+                </th>
+                <th class="text-left px-4 py-2.5">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for row in marketplace_sync_rows %}
+              <tr class="hover:bg-slate-50 transition">
+                <td class="px-4 py-2">
+                  {% if row.main_image_url %}
+                  <img src="{{ row.main_image_url }}" alt="" class="w-9 h-9 object-contain rounded bg-slate-100" loading="lazy" />
+                  {% else %}
+                  <div class="w-9 h-9 bg-slate-100 rounded"></div>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2.5 max-w-xs">
+                  <a href="{{ base_path }}/product/{{ row.product_id }}"
+                    class="text-slate-700 hover:text-indigo-600 font-medium text-xs transition block truncate">{{ row.title or row.product_id }}</a>
+                  <span class="text-slate-400 font-mono text-xs">{{ row.product_id }}</span>
+                </td>
+                <td class="px-4 py-2.5">
+                  {% if row.store_name == 'Store A' %}
+                  <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap">Store A</span>
+                  {% else %}
+                  <span class="bg-slate-100 text-slate-600 border border-slate-300 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap">{{ row.store_name }}</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2.5 text-right">
+                  {% if row.supplier_stock == 0 %}
+                  <span class="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-xs font-semibold">{{ row.supplier_stock }}</span>
+                  {% else %}
+                  <span class="bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded text-xs font-semibold">{{ row.supplier_stock }}</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2.5 text-right">
+                  {% if row.marketplace_stock == 0 %}
+                  <span class="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-xs font-semibold">{{ row.marketplace_stock }}</span>
+                  {% else %}
+                  <span class="bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded text-xs font-semibold">{{ row.marketplace_stock }}</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2.5 text-right">
+                  {% if row.local_stock and row.local_stock > 0 %}
+                  <span class="bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded text-xs font-semibold">{{ row.local_stock }}</span>
+                  {% else %}
+                  <span class="text-slate-300 text-xs">0</span>
+                  {% endif %}
+                </td>
+                <td class="px-4 py-2.5 text-right text-slate-600 font-medium">{{ "%.2f"|format(row.supplier_dealer_price) }}</td>
+                <td class="px-4 py-2.5 text-right text-slate-600 font-medium">{{ "%.2f"|format(row.marketplace_price) }}</td>
+                <td class="px-4 py-2.5">
+                  {% if row.status == 'CRITICAL LOSS' %}
+                  {% set deficit = (row.supplier_dealer_price * 1.10) - row.marketplace_price %}
+                  <div>
+                    <span class="bg-red-600 text-white font-bold px-2 py-1 rounded text-xs animate-pulse whitespace-nowrap">CRITICAL LOSS</span>
+                    <div class="text-red-600 text-xs font-semibold mt-0.5 whitespace-nowrap">-{{ "%.2f"|format(deficit) }} € below floor</div>
+                  </div>
+                  {% elif row.status == 'GHOST STOCK' %}
+                  <span class="bg-purple-700 text-white font-semibold px-2 py-1 rounded text-xs whitespace-nowrap">GHOST STOCK</span>
+                  {% elif row.status == 'MISSING STOCK' %}
+                  <span class="bg-blue-600 text-white font-semibold px-2 py-1 rounded text-xs whitespace-nowrap">MISSING STOCK</span>
+                  {% elif row.status == 'LOW MARGIN' %}
+                  {% set margin_pct = ((row.marketplace_price / row.supplier_dealer_price - 1) * 100) if row.supplier_dealer_price > 0 else 0 %}
+                  <span class="bg-amber-500 text-white font-semibold px-2 py-1 rounded text-xs whitespace-nowrap">LOW MARGIN ({{ "%.0f"|format(margin_pct) }}%)</span>
+                  {% else %}
+                  <span class="bg-slate-100 text-slate-500 border border-slate-200 px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap">{{ row.status }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div class="flex items-center justify-between">
+        <p class="text-xs text-slate-400">
+          Showing {{ marketplace_sync_rows | length }} of {{ marketplace_sync_total }} result{{ 's' if marketplace_sync_total != 1 }}
+          {% if marketplace_q or marketplace_store or marketplace_status %} (filtered from {{ marketplace_sync_batch_total }} total){% endif %}
+        </p>
+        <div class="flex gap-2">
+          {% if marketplace_page > 1 %}
+          <a href="{{ page_url(request, marketplace_page=marketplace_page - 1) }}"
+            class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-600 px-3 py-1.5 rounded-md text-sm font-medium transition">← Prev</a>
+          {% endif %}
+          {% if marketplace_page < marketplace_total_pages %}
+          <a href="{{ page_url(request, marketplace_page=marketplace_page + 1) }}"
+            class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-600 px-3 py-1.5 rounded-md text-sm font-medium transition">Next →</a>
+          {% endif %}
+        </div>
+      </div>
+
+      {% else %}
+      <div class="bg-white border border-slate-200 rounded-lg px-5 py-12 text-center">
+        {% if marketplace_q or marketplace_store or marketplace_status %}
+        <p class="text-slate-400 text-sm mb-1">No results for current filters.</p>
+        <a href="{{ page_url(request, marketplace_page=1, marketplace_q='', marketplace_store='', marketplace_status='') }}"
+          class="text-indigo-500 text-xs hover:underline">Clear filters</a>
+        {% else %}
+        <p class="text-slate-400 text-sm mb-1">No discrepancies found.</p>
+        <p class="text-slate-300 text-xs">Click "Sync Marketplace Now" to run a fresh comparison.</p>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <script>
+    const BASE = '{{ base_path }}';
+    const panels = ['stock', 'price', 'catalog', 'marketplacesync'];
+
+    const _p = new URLSearchParams(window.location.search);
+    if (_p.has('q') || _p.has('brand') || _p.has('not_listed') || (_p.get('page') && _p.get('page') !== '1')) {
+      document.addEventListener('DOMContentLoaded', () => switchTab('catalog'));
+    }
+    if (_p.has('marketplace_q') || _p.has('marketplace_store') || _p.has('marketplace_status') || _p.has('marketplace_sort_by') || (_p.get('marketplace_page') && _p.get('marketplace_page') !== '1')) {
+      document.addEventListener('DOMContentLoaded', () => switchTab('marketplacesync'));
+    }
+
+    function switchTab(name) {
+      panels.forEach(p => {
+        document.getElementById('panel-' + p).classList.toggle('hidden', p !== name);
+        const btn = document.getElementById('tab-' + p);
+        if (p === name) {
+          btn.classList.replace('border-transparent', 'border-indigo-600');
+          btn.classList.replace('text-slate-500', 'text-indigo-600');
+        } else {
+          btn.classList.replace('border-indigo-600', 'border-transparent');
+          btn.classList.replace('text-indigo-600', 'text-slate-500');
+        }
+      });
+    }
+
+    async function syncAll(btn) {
+      const banner = document.getElementById('banner');
+      btn.disabled = true;
+      btn.textContent = 'Starting…';
+      banner.className = 'mb-4 px-4 py-2.5 rounded-md text-sm font-medium border bg-slate-100 text-slate-700 border-slate-200';
+      banner.textContent = 'Sending request…';
+      banner.classList.remove('hidden');
+
+      try {
+        const res = await fetch(BASE + '/sync-all', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.status === 'sync_started') {
+          banner.className = 'mb-4 px-4 py-2.5 rounded-md text-sm font-medium border bg-blue-50 text-blue-800 border-blue-200';
+          let secs = 70;
+          const tick = () => {
+            banner.textContent = `Fetching supplier CSV + syncing Marketplace in background — refreshes in ${secs}s…`;
+            if (secs-- > 0) setTimeout(tick, 1000); else location.reload();
+          };
+          tick();
+          btn.disabled = false;
+          btn.textContent = 'Fetch & Sync All';
+        } else {
+          banner.className = 'mb-4 px-4 py-2.5 rounded-md text-sm font-medium border bg-red-50 text-red-800 border-red-200';
+          banner.textContent = `Error: ${data.detail || 'Unknown error'}`;
+          btn.disabled = false;
+          btn.textContent = 'Fetch & Sync All';
+        }
+      } catch (e) {
+        banner.className = 'mb-4 px-4 py-2.5 rounded-md text-sm font-medium border bg-red-50 text-red-800 border-red-200';
+        banner.textContent = 'Network error.';
+        btn.disabled = false;
+        btn.textContent = 'Fetch & Sync All';
+      }
+    }
+
+    async function uploadCSV(input, url) {
+      const file = input.files[0];
+      if (!file) return;
+
+      const banner = document.getElementById('banner');
+      banner.className = 'mb-4 px-4 py-2.5 rounded-md text-sm font-medium border bg-slate-100 text-slate-700 border-slate-200';
+      banner.textContent = 'Uploading…';
+      banner.classList.remove('hidden');
+
+      const form = new FormData();
+      form.append('file', file);
+
+      try {
+        const res = await fetch(url, { method: 'POST', body: form });
+        const data = await res.json();
+        if (res.ok) {
+          const count = data.imported ?? data.synced;
+          banner.className = 'mb-4 px-4 py-2.5 rounded-md text-sm font-medium border bg-green-50 text-green-800 border-green-200';
+          banner.textContent = `Success — ${count} rows imported. Refreshing…`;
+          setTimeout(() => location.reload(), 800);
+        } else {
+          banner.className = 'mb-4 px-4 py-2.5 rounded-md text-sm font-medium border bg-red-50 text-red-800 border-red-200';
+          banner.textContent = `Error: ${data.detail}`;
+        }
+      } catch (e) {
+        banner.className = 'mb-4 px-4 py-2.5 rounded-md text-sm font-medium border bg-red-50 text-red-800 border-red-200';
+        banner.textContent = 'Network error.';
+      }
+
+      input.value = '';
+    }
+
+    async function syncMarketplaceNow(btn) {
+      const banner = document.getElementById('banner');
+      btn.disabled = true;
+      btn.textContent = 'Starting…';
+      banner.className = 'mb-4 px-4 py-2.5 rounded-md text-sm font-medium border bg-slate-100 text-slate-700 border-slate-200';
+      banner.textContent = 'Sending sync request…';
+      banner.classList.remove('hidden');
+
+      try {
+        const res = await fetch(BASE + '/marketplace/sync-now', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.status === 'sync_started') {
+          banner.className = 'mb-4 px-4 py-2.5 rounded-md text-sm font-medium border bg-blue-50 text-blue-800 border-blue-200';
+          let secs = 35;
+          const tick = () => {
+            banner.textContent = `Marketplace sync running in background — page refreshes in ${secs}s…`;
+            if (secs-- > 0) setTimeout(tick, 1000); else location.reload();
+          };
+          tick();
+          btn.disabled = false;
+          btn.textContent = 'Sync Marketplace Now';
+        } else {
+          banner.className = 'mb-4 px-4 py-2.5 rounded-md text-sm font-medium border bg-red-50 text-red-800 border-red-200';
+          banner.textContent = `Error: ${data.detail || 'Unknown error'}`;
+          btn.disabled = false;
+          btn.textContent = 'Sync Marketplace Now';
+        }
+      } catch (e) {
+        banner.className = 'mb-4 px-4 py-2.5 rounded-md text-sm font-medium border bg-red-50 text-red-800 border-red-200';
+        banner.textContent = 'Network error.';
+        btn.disabled = false;
+        btn.textContent = 'Sync Marketplace Now';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+pandas
+apscheduler
+python-multipart
+jinja2
+httpx
+python-dotenv
+openpyxl

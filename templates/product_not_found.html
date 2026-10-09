@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Not Found — SupplierCSV Monster</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen font-sans antialiased">
+
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
+    <div class="max-w-3xl mx-auto px-6 py-3 flex items-center justify-between">
+      <a href="/?marketplace_page=1" class="inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 text-sm font-medium transition">
+        ← Back to Dashboard
+      </a>
+      <span class="text-xs text-slate-400 font-mono">{{ product_id }}</span>
+    </div>
+  </header>
+
+  <div class="max-w-3xl mx-auto px-6 py-16 flex flex-col items-center text-center">
+
+    <div class="w-16 h-16 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mb-6">
+      <svg class="w-8 h-8 text-amber-500" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+      </svg>
+    </div>
+
+    <h1 class="text-xl font-semibold text-slate-900 mb-2">Product Not in Local Catalog</h1>
+    <p class="text-slate-500 text-sm max-w-md mb-1">
+      Offer ID <span class="font-mono font-semibold text-slate-700">{{ product_id }}</span> exists on Marketplace but is missing from your local Supplier CSV catalog.
+    </p>
+    <p class="text-slate-400 text-xs max-w-md mb-8">
+      This usually means the product was listed on Marketplace before being added to the supplier feed, or it was removed from the CSV. You can manually map or assign a local Product ID below.
+    </p>
+
+    <div class="w-full max-w-sm bg-white border border-slate-200 rounded-xl p-6 text-left">
+      <label class="text-slate-400 text-xs font-medium uppercase tracking-wide block mb-1.5">Marketplace Offer ID</label>
+      <div class="flex gap-2 mb-4">
+        <input type="text" value="{{ product_id }}" readonly
+          class="flex-1 border border-slate-200 rounded-md px-3 py-1.5 text-sm font-mono text-slate-500 bg-slate-50 cursor-not-allowed" />
+      </div>
+      <p class="text-xs text-slate-400">
+        To link this offer to a supplier product, open the product detail page and update its Offer ID field to <span class="font-mono font-semibold">{{ product_id }}</span>.
+      </p>
+    </div>
+
+    <div class="flex gap-3 mt-8">
+      <a href="/?marketplace_page=1"
+        class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-md text-sm font-medium transition">
+        Back to Marketplace Sync
+      </a>
+      <a href="/"
+        class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-600 px-5 py-2 rounded-md text-sm font-medium transition">
+        Go to Catalog
+      </a>
+    </div>
+
+  </div>
+
+</body>
+</html>

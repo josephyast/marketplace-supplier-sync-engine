@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ product.title or product.product_id }} — SupplierCSV Monster</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen font-sans antialiased">
+
+  <!-- Top Nav Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
+    <div class="max-w-5xl mx-auto px-6 py-3 flex items-center justify-between">
+      <a href="javascript:history.back()"
+        class="inline-flex items-center gap-1.5 text-indigo-600 hover:text-indigo-700 text-sm font-medium transition">
+        ← Back
+      </a>
+      <span class="text-xs text-slate-400 font-mono">{{ product.product_id }}</span>
+    </div>
+  </header>
+
+  <div class="max-w-5xl mx-auto px-6 py-8 space-y-6">
+
+    <!-- Product Card -->
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div class="flex gap-0 divide-x divide-slate-200">
+
+        <!-- Left: Image -->
+        <div class="flex-shrink-0 w-56 flex items-center justify-center p-6 bg-slate-50">
+          {% if product.main_image_url %}
+          <img src="{{ product.main_image_url }}" alt="{{ product.title }}"
+            class="w-40 h-40 object-contain" />
+          {% else %}
+          <div class="w-40 h-40 flex items-center justify-center text-slate-300 text-xs text-center">No image</div>
+          {% endif %}
+        </div>
+
+        <!-- Right: Details -->
+        <div class="flex-1 p-6 min-w-0">
+          <h1 class="text-lg font-semibold text-slate-900 leading-snug mb-4">{{ product.title or '—' }}</h1>
+
+          <!-- Meta row -->
+          <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm mb-5">
+            <div>
+              <span class="text-slate-400 text-xs font-medium uppercase tracking-wide block mb-0.5">Brand</span>
+              <span class="text-slate-700 font-medium">{{ product.brand or '—' }}</span>
+            </div>
+            <div>
+              <span class="text-slate-400 text-xs font-medium uppercase tracking-wide block mb-0.5">EAN</span>
+              <span class="text-slate-700 font-mono text-xs">{{ product.ean or '—' }}</span>
+            </div>
+            <div>
+              <span class="text-slate-400 text-xs font-medium uppercase tracking-wide block mb-0.5">Availability</span>
+              {% if product.availability == '1' %}
+              <span class="bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded text-xs font-semibold">In Stock</span>
+              {% else %}
+              <span class="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-xs font-semibold">{{ product.availability or 'Unknown' }}</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Key stats -->
+          <div class="flex gap-6 mb-5">
+            <div>
+              <div class="text-slate-400 text-xs font-medium uppercase tracking-wide mb-1">Current Stock</div>
+              {% if product.stock == 0 %}
+              <div class="text-3xl font-bold text-red-600">{{ product.stock }}</div>
+              {% else %}
+              <div class="text-3xl font-bold text-green-600">{{ product.stock }}</div>
+              {% endif %}
+            </div>
+            <div class="w-px bg-slate-200"></div>
+            <div>
+              <div class="text-slate-400 text-xs font-medium uppercase tracking-wide mb-1">Dealer Price</div>
+              <div class="text-3xl font-bold text-indigo-600">{{ "%.2f"|format(product.dealer_price) }} <span class="text-base font-medium text-slate-400">€</span></div>
+            </div>
+            <div class="w-px bg-slate-200"></div>
+            <div>
+              <div class="text-slate-400 text-xs font-medium uppercase tracking-wide mb-1">Price</div>
+              <div class="text-2xl font-semibold text-slate-700">{{ "%.2f"|format(product.price) }} <span class="text-sm font-medium text-slate-400">€</span></div>
+            </div>
+          </div>
+
+          <!-- Marketplace Marketplace Status -->
+          <div class="mb-5">
+            <div class="text-slate-400 text-xs font-medium uppercase tracking-wide mb-2">Marketplace Marketplace</div>
+            <div class="flex flex-wrap gap-3">
+
+              {% if store_a_found %}
+              <div class="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 min-w-36">
+                <div class="inline-flex items-center gap-1.5 text-emerald-700 text-xs font-semibold mb-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                  Store A
+                </div>
+                <div class="flex gap-3 text-xs">
+                  <div>
+                    <div class="text-slate-400 font-medium">Price</div>
+                    <div class="text-slate-700 font-semibold">{{ "%.2f"|format(store_a_price) }} ₽</div>
+                  </div>
+                  <div>
+                    <div class="text-slate-400 font-medium">Stock</div>
+                    <div class="{% if store_a_stock == 0 %}text-red-600{% else %}text-emerald-700{% endif %} font-semibold">{{ store_a_stock }}</div>
+                  </div>
+                </div>
+              </div>
+              {% else %}
+              <div class="inline-flex items-center gap-1.5 bg-rose-50 text-rose-600 border border-rose-200 px-3 py-2 rounded-lg text-xs font-semibold">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block"></span>
+                Not listed — Store A
+              </div>
+              {% endif %}
+
+              {% if store_b_found %}
+              <div class="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 min-w-36">
+                <div class="inline-flex items-center gap-1.5 text-emerald-700 text-xs font-semibold mb-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                  Store B
+                </div>
+                <div class="flex gap-3 text-xs">
+                  <div>
+                    <div class="text-slate-400 font-medium">Price</div>
+                    <div class="text-slate-700 font-semibold">{{ "%.2f"|format(store_b_price) }} ₽</div>
+                  </div>
+                  <div>
+                    <div class="text-slate-400 font-medium">Stock</div>
+                    <div class="{% if store_b_stock == 0 %}text-red-600{% else %}text-emerald-700{% endif %} font-semibold">{{ store_b_stock }}</div>
+                  </div>
+                </div>
+              </div>
+              {% else %}
+              <div class="inline-flex items-center gap-1.5 bg-rose-50 text-rose-600 border border-rose-200 px-3 py-2 rounded-lg text-xs font-semibold">
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-400 inline-block"></span>
+                Not listed — Store B
+              </div>
+              {% endif %}
+
+            </div>
+          </div>
+
+          {% if product.product_url %}
+          <a href="{{ product.product_url }}" target="_blank" rel="noopener"
+            class="inline-flex items-center gap-1 text-sm text-indigo-600 hover:text-indigo-700 font-medium transition">
+            View on supplier site ↗
+          </a>
+          {% endif %}
+
+          <!-- Offer ID editor -->
+          <div class="mt-5 pt-5 border-t border-slate-100">
+            <label class="text-slate-400 text-xs font-medium uppercase tracking-wide block mb-1.5">Marketplace Offer ID</label>
+            <div class="flex items-center gap-2">
+              <input id="offer-id-input" type="text" value="{{ product.offer_id or '' }}"
+                class="flex-1 border border-slate-300 rounded-md px-3 py-1.5 text-sm font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+              <button id="offer-id-btn" onclick="saveOfferId('{{ product.product_id }}')"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-md text-sm font-medium transition disabled:opacity-50 whitespace-nowrap">
+                Save
+              </button>
+            </div>
+            <p id="offer-id-msg" class="text-xs mt-1 text-slate-400 hidden"></p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Historical Analytics Cards -->
+    <div>
+      <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Historical Changes</h2>
+      <div class="grid grid-cols-3 gap-4">
+        {% set periods = [('1 Week', 'week'), ('1 Month', 'month'), ('1 Year', 'year')] %}
+        {% for label, key in periods %}
+        {% set s = analytics['stock_' ~ key] %}
+        {% set p = analytics['price_' ~ key] %}
+        <div class="bg-white border border-slate-200 rounded-xl p-5">
+          <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">{{ label }}</div>
+
+          <div class="mb-4">
+            <div class="text-xs text-slate-400 font-medium mb-1">Stock Δ</div>
+            {% if s %}
+            <div class="text-xl font-bold {% if s.diff > 0 %}text-green-600{% elif s.diff < 0 %}text-red-600{% else %}text-slate-500{% endif %}">
+              {% if s.diff > 0 %}+{% endif %}{{ s.diff }}
+            </div>
+            <div class="text-xs text-slate-400 mt-0.5">was {{ s.past }} on {{ s.date }}</div>
+            {% else %}
+            <div class="text-sm text-slate-300 font-medium">No data</div>
+            {% endif %}
+          </div>
+
+          <div class="pt-4 border-t border-slate-100">
+            <div class="text-xs text-slate-400 font-medium mb-1">Price Δ</div>
+            {% if p %}
+            <div class="text-xl font-bold {% if p.diff < 0 %}text-green-600{% elif p.diff > 0 %}text-orange-600{% else %}text-slate-500{% endif %}">
+              {% if p.diff > 0 %}+{% endif %}{{ "%.2f"|format(p.diff) }} €
+            </div>
+            <div class="text-xs text-slate-400 mt-0.5">was {{ "%.2f"|format(p.past) }} €</div>
+            {% else %}
+            <div class="text-sm text-slate-300 font-medium">No data</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Full History Table -->
+    <div>
+      <h2 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+        Full History <span class="text-slate-400 font-normal normal-case">({{ history|length }} records)</span>
+      </h2>
+      <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-slate-100 text-slate-600 text-xs font-semibold uppercase tracking-wide border-b border-slate-200">
+                <th class="text-left px-5 py-3">Date</th>
+                <th class="text-right px-5 py-3">Stock</th>
+                <th class="text-right px-5 py-3">Price €</th>
+                <th class="text-right px-5 py-3">Dealer €</th>
+                <th class="text-left px-5 py-3">Availability</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {% for row in history %}
+              <tr class="hover:bg-slate-50 transition">
+                <td class="px-5 py-3 text-slate-500 font-mono text-xs">{{ row.fetched_at[:19] }}</td>
+                <td class="px-5 py-3 text-right">
+                  {% if row.stock == 0 %}
+                  <span class="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-xs font-semibold">0</span>
+                  {% else %}
+                  <span class="bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded text-xs font-semibold">{{ row.stock }}</span>
+                  {% endif %}
+                </td>
+                <td class="px-5 py-3 text-right text-slate-600 font-medium">{{ "%.2f"|format(row.price) }}</td>
+                <td class="px-5 py-3 text-right text-indigo-600 font-medium">{{ "%.2f"|format(row.dealer_price) }}</td>
+                <td class="px-5 py-3 text-slate-500">{{ row.availability or '—' }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    async function saveOfferId(productId) {
+      const input = document.getElementById('offer-id-input');
+      const btn   = document.getElementById('offer-id-btn');
+      const msg   = document.getElementById('offer-id-msg');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      msg.classList.add('hidden');
+      try {
+        const res = await fetch(`{{ base_path }}/product/${productId}/update-offer-id`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({offer_id: input.value.trim()}),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          msg.textContent = 'Saved.';
+          msg.className = 'text-xs mt-1 text-green-600';
+          btn.textContent = 'Save';
+        } else {
+          msg.textContent = `Error: ${data.detail || 'unknown'}`;
+          msg.className = 'text-xs mt-1 text-red-600';
+          btn.textContent = 'Save';
+        }
+      } catch (e) {
+        msg.textContent = 'Network error.';
+        msg.className = 'text-xs mt-1 text-red-600';
+        btn.textContent = 'Save';
+      }
+      btn.disabled = false;
+      msg.classList.remove('hidden');
+    }
+  </script>
+</body>
+</html>

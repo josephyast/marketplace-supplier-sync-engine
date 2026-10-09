@@ -1,0 +1,35 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+# data / local backups
+*.db
+*.db-*
+*.sqlite*
+*.bak-*
+*.xlsx
+*.csv
+
+# logs
+*.log
+logs/
+
+# editor / OS / agent
+.idea/
+.vscode/
+.DS_Store
+.claude/
+CLAUDE.md
+node_modules/

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>All Marketplace Products — SupplierCSV Monster</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen font-sans antialiased">
+
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-10">
+    <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a href="{{ base_path }}/" class="text-indigo-600 hover:text-indigo-700 text-sm font-medium transition">← Dashboard</a>
+        <span class="text-slate-300">|</span>
+        <span class="text-sm font-semibold text-slate-800">All Marketplace Products</span>
+        <span class="bg-slate-100 text-slate-500 text-xs font-semibold px-2 py-0.5 rounded-full">{{ "{:,}".format(total) }}</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-6 py-6">
+
+    {# filter + sort params without page — for pagination links #}
+    {% set fp %}q={{ q }}{% endset %}
+    {% set bp %}{{ fp }}&sort_by={{ sort_by }}&order={{ order }}{% endset %}
+
+    {% macro sort_icon(col) %}
+      {% if sort_by == col %}
+        <span class="text-indigo-500 ml-0.5">{{ '↑' if order == 'asc' else '↓' }}</span>
+      {% endif %}
+    {% endmacro %}
+
+    <!-- Search bar -->
+    <form method="get" action="{{ base_path }}/marketplace/all-products" class="flex gap-2 mb-5">
+      <input name="q" value="{{ q }}" placeholder="Search offer ID or title…"
+        class="flex-1 max-w-sm border border-slate-300 rounded-md px-3 py-1.5 text-sm text-slate-900 placeholder-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      <input type="hidden" name="sort_by" value="{{ sort_by }}" />
+      <input type="hidden" name="order"   value="{{ order }}" />
+      <input type="hidden" name="per_page" value="{{ per_page }}" />
+      <button type="submit"
+        class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-md text-sm font-medium transition">
+        Search
+      </button>
+      {% if q %}
+      <a href="{{ base_path }}/marketplace/all-products?sort_by={{ sort_by }}&order={{ order }}&per_page={{ per_page }}"
+        class="text-slate-400 hover:text-slate-600 text-sm py-1.5 transition">Clear</a>
+      {% endif %}
+    </form>
+
+    {% if rows %}
+
+    <div class="flex items-center justify-between mb-3 text-xs text-slate-500">
+      <span>
+        {{ "{:,}".format(total) }} product{{ 's' if total != 1 }}
+        {% if q %}<span class="text-slate-400">(filtered)</span>{% endif %}
+      </span>
+      <span class="text-slate-400">Page {{ page }} / {{ total_pages }}</span>
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-4">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="bg-slate-50 text-slate-500 text-xs font-semibold uppercase tracking-wide border-b border-slate-200 select-none">
+              <th class="px-4 py-2.5 w-12">Img</th>
+              <th class="text-left px-4 py-2.5 cursor-pointer hover:text-slate-700">
+                <a href="{{ base_path }}/marketplace/all-products?page=1&{{ fp }}&sort_by=offer_id&order={{ 'desc' if sort_by == 'offer_id' and order == 'asc' else 'asc' }}&per_page={{ per_page }}">
+                  Offer ID {{ sort_icon('offer_id') }}
+                </a>
+              </th>
+              <th class="text-left px-4 py-2.5 text-slate-500">Title</th>
+              <th class="text-left px-4 py-2.5 cursor-pointer hover:text-slate-700">
+                <a href="{{ base_path }}/marketplace/all-products?page=1&{{ fp }}&sort_by=store_name&order={{ 'desc' if sort_by == 'store_name' and order == 'asc' else 'asc' }}&per_page={{ per_page }}">
+                  Store {{ sort_icon('store_name') }}
+                </a>
+              </th>
+              <th class="text-right px-4 py-2.5 cursor-pointer hover:text-slate-700">
+                <a href="{{ base_path }}/marketplace/all-products?page=1&{{ fp }}&sort_by=marketplace_price&order={{ 'desc' if sort_by == 'marketplace_price' and order == 'asc' else 'asc' }}&per_page={{ per_page }}">
+                  Marketplace Price ₽ {{ sort_icon('marketplace_price') }}
+                </a>
+              </th>
+              <th class="text-right px-4 py-2.5 cursor-pointer hover:text-slate-700">
+                <a href="{{ base_path }}/marketplace/all-products?page=1&{{ fp }}&sort_by=marketplace_stock&order={{ 'desc' if sort_by == 'marketplace_stock' and order == 'asc' else 'asc' }}&per_page={{ per_page }}">
+                  Marketplace Stock {{ sort_icon('marketplace_stock') }}
+                </a>
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            {% for row in rows %}
+            <tr class="hover:bg-slate-50 transition">
+              <td class="px-4 py-2">
+                {% if row.main_image_url %}
+                <img src="{{ row.main_image_url }}" alt="" class="w-9 h-9 object-contain rounded bg-slate-100" loading="lazy" />
+                {% else %}
+                <div class="w-9 h-9 bg-slate-100 rounded"></div>
+                {% endif %}
+              </td>
+              <td class="px-4 py-2.5">
+                <a href="{{ base_path }}/product/{{ row.offer_id }}"
+                  class="text-indigo-600 hover:text-indigo-700 font-mono text-xs font-semibold transition">
+                  {{ row.offer_id }}
+                </a>
+              </td>
+              <td class="px-4 py-2.5 max-w-xs truncate text-slate-700" title="{{ row.title }}">
+                {{ row.title or '—' }}
+              </td>
+              <td class="px-4 py-2.5">
+                {% if row.store_name == 'Store A' %}
+                <span class="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded text-xs font-semibold">Store A</span>
+                {% else %}
+                <span class="bg-slate-100 text-slate-600 border border-slate-300 px-2 py-0.5 rounded text-xs font-semibold">{{ row.store_name }}</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-2.5 text-right font-medium text-slate-700">
+                {{ "%.2f"|format(row.marketplace_price) }}
+              </td>
+              <td class="px-4 py-2.5 text-right">
+                {% if row.marketplace_stock == 0 %}
+                <span class="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded text-xs font-semibold">0</span>
+                {% else %}
+                <span class="bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded text-xs font-semibold">{{ row.marketplace_stock }}</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div class="flex items-center justify-between">
+      <p class="text-xs text-slate-400">Showing {{ rows|length }} of {{ total }} products</p>
+      <div class="flex gap-2">
+        {% if page > 1 %}
+        <a href="{{ base_path }}/marketplace/all-products?page={{ page - 1 }}&{{ bp }}&per_page={{ per_page }}"
+          class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-600 px-3 py-1.5 rounded-md text-sm font-medium transition">← Prev</a>
+        {% endif %}
+        {% if page < total_pages %}
+        <a href="{{ base_path }}/marketplace/all-products?page={{ page + 1 }}&{{ bp }}&per_page={{ per_page }}"
+          class="bg-white hover:bg-slate-50 border border-slate-300 text-slate-600 px-3 py-1.5 rounded-md text-sm font-medium transition">Next →</a>
+        {% endif %}
+      </div>
+    </div>
+
+    {% else %}
+    <div class="bg-white border border-slate-200 rounded-xl px-5 py-16 text-center">
+      {% if q %}
+      <p class="text-slate-400 text-sm mb-2">No products match "{{ q }}".</p>
+      <a href="{{ base_path }}/marketplace/all-products" class="text-indigo-500 text-xs hover:underline">Clear search</a>
+      {% else %}
+      <p class="text-slate-400 text-sm mb-1">No Marketplace products cached yet.</p>
+      <p class="text-slate-300 text-xs">Run "Fetch &amp; Sync All" from the dashboard to populate.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div>
+</body>
+</html>
